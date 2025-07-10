@@ -2,68 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Camera Stream</title>
+    <title>Live Camera Stream</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body, html {
+        html, body {
             margin: 0;
             padding: 0;
             height: 100%;
-            background-color: #111;
+            background: black;
             font-family: sans-serif;
-            color: white;
-        }
-        #controls {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 10;
-            background: rgba(0,0,0,0.6);
-            padding: 10px 15px;
-            border-radius: 8px;
-        }
-        select, button {
-            margin-right: 10px;
-            padding: 5px 10px;
-            background: #333;
-            border: none;
-            border-radius: 5px;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        select:focus, button:focus {
-            outline: none;
-            box-shadow: 0 0 0 2px #555;
         }
         video {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            background: black;
+        }
+        .controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 9999;
+            background: rgba(0,0,0,0.5);
+            padding: 8px;
+            border-radius: 8px;
+        }
+        select, button {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 4px;
+            background: white;
+            color: black;
+            font-size: 14px;
+        }
+        button:active {
+            background: #ddd;
         }
     </style>
 </head>
 <body>
-    <div id="controls">
+    <div class="controls">
         <select id="cameraSelect"></select>
-        <button id="fullscreenButton">Fullscreen</button>
+        <button id="fullscreenBtn">Fullscreen</button>
     </div>
     <video id="video" autoplay playsinline muted></video>
 
     <script>
         const video = document.getElementById('video');
         const cameraSelect = document.getElementById('cameraSelect');
-        const fullscreenButton = document.getElementById('fullscreenButton');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
         let stream;
 
-        async function init() {
+        async function getCamerasAndStart() {
             try {
-                // Get permission immediately
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-
-                // Get device list
+                // Get camera list
                 const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
                 cameraSelect.innerHTML = '';
                 videoDevices.forEach(device => {
                     const option = document.createElement('option');
@@ -72,14 +69,11 @@
                     cameraSelect.appendChild(option);
                 });
 
-                // Start with the first camera
-                if (videoDevices[0]) {
-                    await startStream(videoDevices[0].deviceId);
-                }
-
+                // Start stream with default camera
+                await startStream(cameraSelect.value);
             } catch (err) {
-                alert('Error accessing camera: ' + err.message);
-                console.error(err);
+                console.error('Error accessing cameras:', err);
+                alert('Error accessing cameras. Please check permissions.');
             }
         }
 
@@ -87,27 +81,24 @@
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: deviceId } }
-            });
+            const constraints = {
+                video: { deviceId: deviceId ? { exact: deviceId } : undefined }
+            };
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
         }
 
-        cameraSelect.addEventListener('change', () => {
-            startStream(cameraSelect.value);
-        });
+        cameraSelect.addEventListener('change', () => startStream(cameraSelect.value));
 
-        fullscreenButton.addEventListener('click', () => {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                video.requestFullscreen().catch(err => console.warn('Fullscreen error:', err));
             } else {
-                video.requestFullscreen().catch(err => {
-                    console.warn('Fullscreen request failed:', err);
-                });
+                document.exitFullscreen();
             }
         });
 
-        window.addEventListener('load', init);
+        getCamerasAndStart();
     </script>
 </body>
 </html>
