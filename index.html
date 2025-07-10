@@ -8,62 +8,106 @@
             margin: 0;
             padding: 0;
             height: 100%;
-            background: black;
+            background-color: #111;
+            font-family: sans-serif;
+            color: white;
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(0,0,0,0.6);
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+        select, button {
+            margin-right: 10px;
+            padding: 5px 10px;
+            background: #333;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        select:focus, button:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #555;
         }
         video {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-        select, button {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 9999;
-        }
     </style>
 </head>
 <body>
-    <select id="cameraSelect"></select>
-    <button id="startButton">Start</button>
-    <video id="video" autoplay playsinline></video>
+    <div id="controls">
+        <select id="cameraSelect"></select>
+        <button id="fullscreenButton">Fullscreen</button>
+    </div>
+    <video id="video" autoplay playsinline muted></video>
 
     <script>
         const video = document.getElementById('video');
         const cameraSelect = document.getElementById('cameraSelect');
-        const startButton = document.getElementById('startButton');
+        const fullscreenButton = document.getElementById('fullscreenButton');
         let stream;
 
-        async function getCameras() {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
-            cameraSelect.innerHTML = '';
-            videoDevices.forEach(device => {
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                option.text = device.label || `Camera ${cameraSelect.length + 1}`;
-                cameraSelect.appendChild(option);
-            });
+        async function init() {
+            try {
+                // Get permission immediately
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+
+                // Get device list
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                cameraSelect.innerHTML = '';
+                videoDevices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Camera ${cameraSelect.length + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+
+                // Start with the first camera
+                if (videoDevices[0]) {
+                    await startStream(videoDevices[0].deviceId);
+                }
+
+            } catch (err) {
+                alert('Error accessing camera: ' + err.message);
+                console.error(err);
+            }
         }
 
-        async function startStream() {
+        async function startStream(deviceId) {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
-            const constraints = {
-                video: { deviceId: cameraSelect.value ? { exact: cameraSelect.value } : undefined }
-            };
-            stream = await navigator.mediaDevices.getUserMedia(constraints);
-            video.srcObject = stream;
-            video.requestFullscreen().catch(err => {
-                console.warn('Fullscreen not supported or blocked:', err);
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: deviceId } }
             });
+            video.srcObject = stream;
         }
 
-        getCameras();
+        cameraSelect.addEventListener('change', () => {
+            startStream(cameraSelect.value);
+        });
 
-        cameraSelect.addEventListener('change', startStream);
-        startButton.addEventListener('click', startStream);
+        fullscreenButton.addEventListener('click', () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                video.requestFullscreen().catch(err => {
+                    console.warn('Fullscreen request failed:', err);
+                });
+            }
+        });
+
+        window.addEventListener('load', init);
     </script>
 </body>
 </html>
